@@ -3,6 +3,8 @@
 
 #define OUT_OF_RANGE_PIN_NUMBER 99
 
+#define READ_INDICATOR 26
+
 struct ad7091r_thing {
   int convst_pin;
   int cs_pin;
@@ -119,9 +121,12 @@ int ad7091r_begin(ad7091r_thing *pthing)
 
  
     bcm2835_gpio_write(pthing->cs_pin, HIGH);
-    bcm2835_gpio_write(pthing->clk_pin, LOW);
+    bcm2835_gpio_write(pthing->clk_pin, HIGH);
     bcm2835_gpio_write(pthing->convst_pin, HIGH);
   
+    bcm2835_gpio_fsel(READ_INDICATOR, BCM2835_GPIO_FSEL_OUTP);
+    bcm2835_gpio_write(READ_INDICATOR, LOW);
+
     return 1;
   } 
   else
@@ -147,9 +152,9 @@ int ad7091r_reset(ad7091r_thing *pthing)
 
     for(clock_cycle = 0; clock_cycle < 4; clock_cycle++) //4 cycles only to short the cycle; you can choose between 2 to 8
     { 
-      bcm2835_gpio_write(pthing->clk_pin, HIGH); //Set CLK Pin to HIGH
-      delayMicroseconds(1);
       bcm2835_gpio_write(pthing->clk_pin, LOW); //Set CLK Pin to LOW
+      delayMicroseconds(1);
+      bcm2835_gpio_write(pthing->clk_pin, HIGH); //Set CLK Pin to HIGH
       delayMicroseconds(1);
     }
 
@@ -162,9 +167,9 @@ int ad7091r_reset(ad7091r_thing *pthing)
 
     for(clock_cycle = 0; clock_cycle < 12; clock_cycle++) 
     { 
-      bcm2835_gpio_write(pthing->clk_pin, HIGH); //Set CLK Pin to HIGH
-      delayMicroseconds(1);
       bcm2835_gpio_write(pthing->clk_pin, LOW); //Set CLK Pin to LOW
+      delayMicroseconds(1);
+      bcm2835_gpio_write(pthing->clk_pin, HIGH); //Set CLK Pin to HIGH
       delayMicroseconds(1);
     }
 
@@ -182,26 +187,42 @@ int ad7091r_data(ad7091r_thing *pthing)
   if(pthing != 0)
   {
     int result = 0;
-
+    
+    
+    delayMicroseconds(100);
     //Start a conversion
     bcm2835_gpio_write(pthing->convst_pin, LOW); //Set CONVST Pin to LOW
     delayMicroseconds(1);
-    bcm2835_gpio_write(pthing->convst_pin, HIGH);  //Set CONVST Pin to HIGH
+    
   
     bcm2835_gpio_write(pthing->cs_pin, LOW);        //Set CS Pin to LOW
   
     uint8_t clock_cycle = 0;
     for(clock_cycle = 0; clock_cycle < 12; clock_cycle++) { 
-      bcm2835_gpio_write(pthing->clk_pin, HIGH); //Set CLK Pin to HIGH
-      delayMicroseconds(1);
+
       bcm2835_gpio_write(pthing->clk_pin, LOW); //Set CLK Pin to LOW
+
+      
+      bcm2835_gpio_write(READ_INDICATOR, HIGH);
       result = (result << 1) | (bcm2835_gpio_lev(pthing->data_pin) & 0x01);
+      bcm2835_gpio_write(READ_INDICATOR, LOW);
+
+      
+      delayMicroseconds(1);
+      bcm2835_gpio_write(pthing->clk_pin, HIGH); //Set CLK Pin to HIGH
+      //result = (result << 1) | (bcm2835_gpio_lev(pthing->data_pin) & 0x01);
       delayMicroseconds(1);
     }
   
+    bcm2835_gpio_write(pthing->clk_pin, LOW); //Set CLK Pin to LOW
     delayMicroseconds(1);
+    bcm2835_gpio_write(pthing->clk_pin, HIGH); //Set CLK Pin to HIGH
     bcm2835_gpio_write(pthing->cs_pin, HIGH);
-
+    
+    delayMicroseconds(100);
+    bcm2835_gpio_write(pthing->convst_pin, HIGH);  //Set CONVST Pin to HIGH
+    
+    //It will enter power-low mode
     return result;
   }
   else {
